@@ -20,12 +20,145 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useState } from "react";
-
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 function Dashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const [marketData, setMarketData] = useState([]);
+  const [marketLoading, setMarketLoading] = useState(true);
+
+  const [offers, setOffers] = useState([]);
+  const [offersLoading, setOffersLoading] = useState(true);
+
+  const [priceTrend, setPriceTrend] = useState([]);
+const [trendLoading, setTrendLoading] = useState(true);
+
+useEffect(() => {
+  const fetchPriceTrend = async () => {
+    try {
+      const today = new Date();
+
+      const dates = Array.from({ length: 12 }, (_, index) => {
+        const date = new Date(today);
+        date.setDate(today.getDate() - index);
+
+        const day = String(date.getDate()).padStart(2, "0");
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const year = date.getFullYear();
+
+        return {
+          apiDate: `${day}/${month}/${year}`,
+          label: `${day} ${date.toLocaleString("en-IN", {
+            month: "short",
+          })}`,
+        };
+      });
+
+      const results = await Promise.all(
+        dates.map(async (item) => {
+          const response = await fetch(
+            `http://localhost:5000/api/mandi-prices?crop=Tomato&date=${item.apiDate}&limit=50`
+          );
+
+          const data = await response.json();
+
+          const prices = (data.records || [])
+            .map((record) => Number(record.modal_price))
+            .filter((price) => price > 0);
+
+          const average =
+            prices.length > 0
+              ? Math.round(
+                  prices.reduce((sum, price) => sum + price, 0) /
+                    prices.length
+                )
+              : 0;
+
+          return {
+            date: item.apiDate,
+            label: item.label,
+            price: average,
+          };
+        })
+      );
+
+      setPriceTrend(results.reverse());
+    } catch (error) {
+      console.error("Price trend error:", error);
+    } finally {
+      setTrendLoading(false);
+    }
+  };
+
+  fetchPriceTrend();
+}, []);
+
+  useEffect(() => {
+  const fetchMarketData = async () => {
+    try {
+      const response = await fetch(
+        "http://localhost:5000/api/mandi-prices?crop=Tomato&limit=50"
+      );
+
+      const data = await response.json();
+
+      if (data.success) {
+        setMarketData(data.records || []);
+      }
+    } catch (error) {
+      console.error("Dashboard market data error:", error);
+    } finally {
+      setMarketLoading(false);
+    }
+  };
+
+  fetchMarketData();
+}, []);
+
+  useEffect(() => {
+    const fetchOffers = async () => {
+      try {
+        const response = await fetch(
+          "http://localhost:5000/api/offers"
+        );
+
+        const data = await response.json();
+
+        if (data.success) {
+          setOffers(data.offers || []);
+        }
+      } catch (error) {
+        console.error("Failed to fetch offers:", error);
+      } finally {
+        setOffersLoading(false);
+      }
+    };
+
+    fetchOffers();
+  }, []);
+
+  const validPrices = marketData
+    .map((item) => Number(item.modal_price))
+    .filter((price) => price > 0);
+
+  const averageMarketPrice =
+    validPrices.length > 0
+      ? Math.round(
+          validPrices.reduce((sum, price) => sum + price, 0) /
+            validPrices.length
+        )
+      : 0;
+
+  const lowestMarketPrice =
+    validPrices.length > 0 ? Math.min(...validPrices) : 0;
+
+  const highestMarketPrice =
+    validPrices.length > 0 ? Math.max(...validPrices) : 0;
+
+  const marketCount = marketData.length;
+
 
   return (
     <div className="min-h-screen bg-[#f6f8f6] text-slate-900">
@@ -282,30 +415,37 @@ to="/add-produce"
           <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
 
             <StatCard
-              icon={<IndianRupee size={20} />}
-              label="Average Market Price"
-              value="₹2,850"
-              suffix="/ quintal"
-              change="+8.4%"
-              positive
-            />
+  icon={<IndianRupee size={20} />}
+  label="Average Market Price"
+  value={
+    marketLoading
+      ? "..."
+      : `₹${averageMarketPrice.toLocaleString("en-IN")}`
+  }
+  suffix="/ quintal"
+  change="Daily mandi data"
+  positive
+/>
 
             <StatCard
-              icon={<TrendingUp size={20} />}
-              label="Expected Price"
-              value="₹3,150"
-              suffix="/ quintal"
-              change="+10.5%"
-              positive
-            />
-
+  icon={<TrendingUp size={20} />}
+  label="Highest Mandi Price"
+  value={
+    marketLoading
+      ? "..."
+      : `₹${highestMarketPrice.toLocaleString("en-IN")}`
+  }
+  suffix="/ quintal"
+  change="Current listings"
+  positive
+/>
             <StatCard
-              icon={<ShoppingCart size={20} />}
-              label="Nearby Markets"
-              value="12"
-              suffix=" markets"
-              change="3 nearby"
-            />
+  icon={<ShoppingCart size={20} />}
+  label="Mandi Listings"
+  value={marketLoading ? "..." : marketCount}
+  suffix=" listings"
+  change="Government data"
+/>
 
             <StatCard
               icon={<Users size={20} />}
@@ -386,20 +526,32 @@ to="/add-produce"
               {/* Chart summary */}
               <div className="mt-6 grid grid-cols-3 gap-3">
 
-                <MiniMetric
-                  label="Lowest"
-                  value="₹2,450"
-                />
+              <MiniMetric 
+  label="Lowest" 
+  value={
+    marketLoading
+      ? "..."
+      : `₹${lowestMarketPrice.toLocaleString("en-IN")}`
+  }
+/>
 
-                <MiniMetric
-                  label="Average"
-                  value="₹2,850"
-                />
+<MiniMetric
+  label="Average"
+  value={
+    marketLoading
+      ? "..."
+      : `₹${averageMarketPrice.toLocaleString("en-IN")}`
+  }
+/>
 
-                <MiniMetric
-                  label="Highest"
-                  value="₹3,120"
-                />
+<MiniMetric
+  label="Highest"
+  value={
+    marketLoading
+      ? "..."
+      : `₹${highestMarketPrice.toLocaleString("en-IN")}`
+  }
+/>
 
               </div>
 
@@ -601,6 +753,108 @@ to="/add-produce"
 
           </div>
 
+          {/* RECENT OFFERS */}
+<div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+
+  <div className="flex items-center justify-between">
+
+    <div>
+      <h3 className="text-lg font-bold">
+        Recent Offers
+      </h3>
+
+      <p className="mt-1 text-sm text-slate-400">
+        Your latest buyer connections
+      </p>
+    </div>
+
+    <Link
+      to="/buyers"
+      className="flex items-center gap-1 text-sm font-bold text-green-600"
+    >
+      Find Buyers
+      <ChevronRight size={16} />
+    </Link>
+
+  </div>
+
+  {offersLoading ? (
+    <div className="mt-5 rounded-xl bg-slate-50 p-6 text-center">
+      <p className="text-sm text-slate-400">
+        Loading offers...
+      </p>
+    </div>
+  ) : offers.length === 0 ? (
+    <div className="mt-5 rounded-xl border border-dashed border-slate-200 p-8 text-center">
+      <SendIcon />
+      <p className="mt-3 font-bold">
+        No offers yet
+      </p>
+      <p className="mt-1 text-sm text-slate-400">
+        Find a buyer and send your first selling offer.
+      </p>
+
+      <Link
+        to="/buyers"
+        className="mt-4 inline-flex items-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-green-700"
+      >
+        Find Buyers
+        <ArrowUpRight size={16} />
+      </Link>
+    </div>
+  ) : (
+    <div className="mt-5 space-y-3">
+
+      {offers.slice(0, 3).map((offer) => (
+        <div
+          key={offer._id}
+          className="flex flex-col gap-4 rounded-xl border border-slate-100 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between"
+        >
+
+          <div className="flex items-center gap-3">
+
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-100 font-black text-green-700">
+              {offer.buyerName?.charAt(0)}
+            </div>
+
+            <div>
+              <p className="font-bold">
+                {offer.buyerName}
+              </p>
+
+              <p className="mt-1 text-xs text-slate-400">
+                {offer.crop} · {offer.quantity} kg
+              </p>
+            </div>
+
+          </div>
+
+          <div className="flex items-center justify-between gap-6 sm:justify-end">
+
+            <div className="text-left sm:text-right">
+              <p className="text-sm font-black">
+                ₹{Number(offer.offeredPrice).toLocaleString("en-IN")}
+              </p>
+
+              <p className="mt-1 text-xs text-slate-400">
+                / quintal
+              </p>
+            </div>
+
+            <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-bold text-green-700">
+              {offer.status}
+            </span>
+
+          </div>
+
+        </div>
+      ))}
+
+    </div>
+  )}
+
+</div>
+
           {/* MARKET ALERT */}
           <div className="mt-6 flex flex-col gap-4 rounded-2xl border border-green-100 bg-green-50 p-5 sm:flex-row sm:items-center sm:justify-between">
 
@@ -638,6 +892,14 @@ to="/add-produce"
 }
 
 /* ================= COMPONENTS ================= */
+
+function SendIcon() {
+  return (
+    <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-green-50 text-green-600">
+      <Users size={20} />
+    </div>
+  );
+}
 
 function NavItem({ icon, label, active }) {
   return (

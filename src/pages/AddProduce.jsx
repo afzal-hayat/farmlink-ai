@@ -8,39 +8,86 @@ import {
   Package,
   Sprout,
 } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
 
 function AddProduce() {
-  const navigate = useNavigate();
+const navigate = useNavigate();
+const location = useLocation();
 
+const selectedMarket = location.state?.selectedMarket || null;
   const [form, setForm] = useState({
     crop: "Tomato",
     quantity: "",
     location: "Greater Noida",
     expectedPrice: "",
     harvestDate: "",
+    sellingDate: "",
   });
 
   const [analyzing, setAnalyzing] = useState(false);
+  const [error, setError] = useState("");
 
   const handleChange = (e) => {
     setForm({
       ...form,
       [e.target.name]: e.target.value,
     });
+
+    setError("");
   };
 
-  const handleAnalyze = (e) => {
+  const handleAnalyze = async (e) => {
     e.preventDefault();
 
     setAnalyzing(true);
+    setError("");
 
-    setTimeout(() => {
-      navigate("/analysis", {
-        state: form,
+    try {
+      const response = await fetch("http://localhost:5000/api/produce", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          crop: form.crop,
+          quantity: Number(form.quantity),
+          location: form.location,
+          expectedPrice: Number(form.expectedPrice),
+          harvestDate: form.harvestDate,
+          sellingDate: form.sellingDate,
+        }),
       });
-    }, 1000);
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to add produce");
+      }
+
+      console.log("✅ Produce saved:", data);
+
+      // Move to analysis page after successful database save
+      navigate("/analysis", {
+        state: {
+          ...form,
+          quantity: Number(form.quantity),
+          expectedPrice: Number(form.expectedPrice),
+          produceId: data.produce._id,
+          selectedMarket,
+        },
+      });
+    } catch (error) {
+      console.error("❌ Error:", error);
+
+      setError(
+        error.message ||
+          "Something went wrong while saving your produce."
+      );
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   return (
@@ -101,6 +148,29 @@ function AddProduce() {
           </p>
 
         </div>
+
+        {selectedMarket && (
+  <div className="mt-6 flex items-center gap-4 rounded-2xl border border-green-200 bg-green-50 p-4">
+    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-600 text-white">
+      <MapPin size={20} />
+    </div>
+
+    <div>
+      <p className="text-xs font-bold uppercase tracking-wider text-green-600">
+        Selected Market
+      </p>
+
+      <p className="mt-1 font-black text-slate-900">
+        {selectedMarket.name}
+      </p>
+
+      <p className="text-sm text-slate-500">
+        {selectedMarket.city} · ₹
+        {selectedMarket.price.toLocaleString("en-IN")} / quintal
+      </p>
+    </div>
+  </div>
+)}
 
         {/* PROGRESS */}
         <div className="mt-10 flex items-center gap-3">
@@ -267,7 +337,7 @@ function AddProduce() {
                 <label className="text-sm font-bold text-slate-700">
                   Expected Price
                   <span className="ml-1 font-normal text-slate-400">
-                    (optional)
+                    (per kg)
                   </span>
                 </label>
 
@@ -279,6 +349,7 @@ function AddProduce() {
                   />
 
                   <input
+                    required
                     type="number"
                     min="0"
                     name="expectedPrice"
@@ -296,10 +367,9 @@ function AddProduce() {
               </div>
 
               {/* HARVEST DATE */}
-              <div className="sm:col-span-2">
-
+              <div>
                 <label className="text-sm font-bold text-slate-700">
-                  Expected Harvest / Selling Date
+                  Harvest Date
                 </label>
 
                 <div className="relative mt-2">
@@ -310,6 +380,7 @@ function AddProduce() {
                   />
 
                   <input
+                    required
                     type="date"
                     name="harvestDate"
                     value={form.harvestDate}
@@ -318,10 +389,41 @@ function AddProduce() {
                   />
 
                 </div>
+              </div>
 
+              {/* SELLING DATE */}
+              <div>
+                <label className="text-sm font-bold text-slate-700">
+                  Selling Date
+                </label>
+
+                <div className="relative mt-2">
+
+                  <CalendarDays
+                    size={18}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-green-600"
+                  />
+
+                  <input
+                    required
+                    type="date"
+                    name="sellingDate"
+                    value={form.sellingDate}
+                    onChange={handleChange}
+                    className="w-full rounded-xl border border-slate-200 py-3.5 pl-10 pr-4 text-sm outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-500/10"
+                  />
+
+                </div>
               </div>
 
             </div>
+
+            {/* ERROR */}
+            {error && (
+              <div className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
+                {error}
+              </div>
+            )}
 
             {/* SUBMIT */}
             <button
@@ -332,7 +434,7 @@ function AddProduce() {
               {analyzing ? (
                 <>
                   <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                  Analyzing Markets...
+                  Saving & Analyzing...
                 </>
               ) : (
                 <>

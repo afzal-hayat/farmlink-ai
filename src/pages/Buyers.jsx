@@ -214,9 +214,14 @@ function Buyers() {
                 className="bg-transparent py-3 text-sm font-semibold outline-none"
               >
                 <option>All</option>
-                <option>Tomato</option>
-                <option>Potato</option>
-                <option>Onion</option>
+<option>Tomato</option>
+<option>Potato</option>
+<option>Onion</option>
+<option>Wheat</option>
+<option>Rice</option>
+<option>Maize</option>
+<option>Carrot</option>
+<option>Cauliflower</option>
               </select>
 
             </div>
@@ -244,9 +249,8 @@ function Buyers() {
                 </p>
 
                 <h2 className="mt-1 text-xl font-bold">
-                  5 buyers may be a good match for your produce.
-                </h2>
-
+  {filteredBuyers.length} buyers may be a good match for your produce.
+</h2>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
                   FarmLink considers crop requirements, location,
                   offered price and demand when finding potential buyers.
@@ -255,17 +259,29 @@ function Buyers() {
 
             </div>
 
-            <button className="flex shrink-0 items-center justify-center gap-2 rounded-xl bg-green-600 px-5 py-3 text-sm font-bold transition hover:bg-green-500">
-              View Matches
-              <ArrowUpRight size={17} />
-            </button>
+           <button
+  onClick={() => {
+    document
+      .getElementById("buyer-list")
+      ?.scrollIntoView({
+        behavior: "smooth",
+      });
+  }}
+  className="flex shrink-0 items-center justify-center gap-2 rounded-xl bg-green-600 px-5 py-3 text-sm font-bold transition hover:bg-green-500"
+>
+  View Matches
+  <ArrowUpRight size={17} />
+</button>
 
           </div>
 
         </div>
 
         {/* BUYERS */}
-        <div className="mt-8">
+        <div
+  id="buyer-list"
+  className="mt-8"
+>
 
           <div className="flex items-center justify-between">
 

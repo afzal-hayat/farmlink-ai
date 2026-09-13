@@ -38,10 +38,38 @@ function SendOffer() {
     });
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const handleSubmit = async (e) => {
+  e.preventDefault();
+
+  try {
+    const response = await fetch("http://localhost:5000/api/offers", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        buyerName: buyer.name,
+        buyerType: buyer.type,
+        buyerLocation: buyer.location,
+        crop: form.crop,
+        quantity: Number(form.quantity),
+        offeredPrice: Number(form.price),
+        message: form.message,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || "Failed to send offer");
+    }
+
     setSent(true);
-  };
+  } catch (error) {
+    console.error("Send Offer Error:", error);
+    alert("Unable to send offer. Please try again.");
+  }
+};
 
   if (sent) {
     return (
@@ -108,6 +136,20 @@ function SendOffer() {
                   ₹{Number(form.price).toLocaleString("en-IN")} / quintal
                 </span>
               </div>
+
+              <div className="mt-3 flex justify-between border-t border-green-100 pt-3">
+  <span className="text-sm text-slate-500">
+    Estimated offer value
+  </span>
+
+  <span className="text-lg font-black text-slate-900">
+    ₹
+    {(
+      (Number(form.quantity || 0) / 100) *
+      Number(form.price || 0)
+    ).toLocaleString("en-IN")}
+  </span>
+</div>
 
             </div>
 
@@ -285,6 +327,15 @@ function SendOffer() {
                   Buyer's current indicative price is ₹
                   {buyer.offeredPrice.toLocaleString("en-IN")} / quintal.
                 </p>
+                {Number(form.price) >= Number(buyer.offeredPrice) ? (
+  <p className="mt-2 text-xs font-semibold text-green-600">
+    ✓ Your offer meets or exceeds the buyer's indicative price.
+  </p>
+) : (
+  <p className="mt-2 text-xs font-semibold text-amber-600">
+    Your offer is below the buyer's indicative price.
+  </p>
+)}
               </div>
 
               <div>
@@ -300,8 +351,7 @@ function SendOffer() {
                   value={form.message}
                   onChange={handleChange}
                   rows="4"
-                  placeholder="Add a note for the buyer..."
-                  className="mt-2 w-full resize-none rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-green-500 focus:ring-4 focus:ring-green-500/10"
+                  placeholder="Example: Fresh harvest available. Ready for pickup from 20 October..."
                 />
               </div>
 

@@ -12,75 +12,87 @@ import {
   Users,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useMemo, useState } from "react";
-
+import { useEffect, useMemo, useState } from "react";
 function Marketplace() {
   const [search, setSearch] = useState("");
   const [cropFilter, setCropFilter] = useState("All");
   const [sort, setSort] = useState("price");
+  const [markets, setMarkets] = useState([]);
+const [loading, setLoading] = useState(true);
+const [error, setError] = useState("");
+const [selectedMarket, setSelectedMarket] = useState(null);
 
-  const markets = [
-    {
-      name: "Azadpur Mandi",
-      city: "Delhi",
-      crop: "Tomato",
-      price: 3120,
-      distance: 48,
-      buyers: 18,
-      demand: "High",
-      change: "+12.4%",
-    },
-    {
-      name: "Okhla Mandi",
-      city: "Delhi",
-      crop: "Tomato",
-      price: 2940,
-      distance: 42,
-      buyers: 12,
-      demand: "High",
-      change: "+8.2%",
-    },
-    {
-      name: "Ghazipur Mandi",
-      city: "Uttar Pradesh",
-      crop: "Tomato",
-      price: 2850,
-      distance: 31,
-      buyers: 9,
-      demand: "Medium",
-      change: "+6.7%",
-    },
-    {
-      name: "Bulandshahr Mandi",
-      city: "Uttar Pradesh",
-      crop: "Potato",
-      price: 2180,
-      distance: 54,
-      buyers: 14,
-      demand: "High",
-      change: "+9.1%",
-    },
-    {
-      name: "Sadar Bazar",
-      city: "Delhi",
-      crop: "Onion",
-      price: 2670,
-      distance: 46,
-      buyers: 11,
-      demand: "Medium",
-      change: "+4.8%",
-    },
-    {
-      name: "Dadri Mandi",
-      city: "Uttar Pradesh",
-      crop: "Onion",
-      price: 2490,
-      distance: 24,
-      buyers: 7,
-      demand: "High",
-      change: "+7.3%",
-    },
-  ];
+
+useEffect(() => {
+  const fetchMarkets = async () => {
+    try {
+      console.log("🚜 Fetching real mandi data...");
+
+      setLoading(true);
+      setError("");
+
+      const response = await fetch(
+        "http://localhost:5000/api/mandi-prices?limit=50"
+      );
+
+      console.log("📡 Response status:", response.status);
+
+      const data = await response.json();
+
+      console.log("🌾 Mandi API response:", data);
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Failed to fetch mandi prices"
+        );
+      }
+
+      const records = Array.isArray(data.records)
+        ? data.records
+        : [];
+
+      console.log("📊 Records received:", records.length);
+
+      const formattedMarkets = records
+        .filter(
+          (record) =>
+            record.market &&
+            Number(record.modal_price) > 0
+        )
+        .map((record) => ({
+          name: String(record.market).trim(),
+          city: record.state || "India",
+          crop: record.commodity || "Unknown",
+          price: Math.round(Number(record.modal_price)),
+minPrice: Math.round(Number(record.min_price)),
+maxPrice: Math.round(Number(record.max_price)),
+distance: null,
+          buyers: null,
+          demand: "Available",
+          change: "Daily price",
+          dataSource: "data.gov.in",
+          arrivalDate: record.arrival_date,
+        }));
+
+      console.log(
+        "✅ Formatted markets:",
+        formattedMarkets
+      );
+
+      setMarkets(formattedMarkets);
+    } catch (error) {
+      console.error("❌ Marketplace API error:", error);
+
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchMarkets();
+}, []);
+
+
 
   const filteredMarkets = useMemo(() => {
     let result = markets.filter((market) => {
@@ -100,16 +112,18 @@ function Marketplace() {
     }
 
     if (sort === "distance") {
-      result.sort((a, b) => a.distance - b.distance);
-    }
-
+  result.sort(
+    (a, b) =>
+      (a.distance ?? Infinity) -
+      (b.distance ?? Infinity)
+  );
+}
     if (sort === "buyers") {
       result.sort((a, b) => b.buyers - a.buyers);
     }
 
     return result;
-  }, [search, cropFilter, sort]);
-
+}, [markets, search, cropFilter, sort]);
   return (
     <div className="min-h-screen bg-[#f6f8f6] text-slate-900">
 
@@ -152,7 +166,7 @@ function Marketplace() {
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-green-200 bg-green-50 px-4 py-2 text-sm font-semibold text-green-700">
               <ShoppingCart size={16} />
-              Live Market Discovery
+              Daily Market Discovery
             </div>
 
             <h1 className="mt-5 text-4xl font-black tracking-tight sm:text-5xl">
@@ -175,39 +189,56 @@ function Marketplace() {
 
         </div>
 
-        {/* SUMMARY */}
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+       {/* SUMMARY */}
+<div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 
-          <SummaryCard
-            icon={<IndianRupee size={20} />}
-            value="₹3,120"
-            label="Highest Price"
-            detail="+12.4% today"
-          />
+  <SummaryCard
+    icon={<IndianRupee size={20} />}
+    value={
+      markets.length > 0
+        ? `₹${Math.max(
+            ...markets.map((m) => m.price)
+          ).toLocaleString("en-IN")}`
+        : "—"
+    }
+    label="Highest Price"
+    detail={
+      markets.length > 0
+        ? markets.reduce((highest, market) =>
+            market.price > highest.price
+              ? market
+              : highest
+          ).name
+        : "Loading..."
+    }
+  />
 
-          <SummaryCard
-            icon={<MapPin size={20} />}
-            value="24 km"
-            label="Nearest Market"
-            detail="Dadri Mandi"
-          />
+  <SummaryCard
+    icon={<MapPin size={20} />}
+    value="—"
+    label="Nearest Market"
+    detail="Distance data unavailable"
+  />
 
-          <SummaryCard
-            icon={<Users size={20} />}
-            value="71"
-            label="Active Buyers"
-            detail="Across listed markets"
-          />
+  <SummaryCard
+    icon={<Users size={20} />}
+    value="—"
+    label="Active Buyers"
+    detail="Not provided by mandi API"
+  />
 
-          <SummaryCard
-            icon={<TrendingUp size={20} />}
-            value="High"
-            label="Current Demand"
-            detail="Tomato"
-          />
+  <SummaryCard
+    icon={<TrendingUp size={20} />}
+    value={
+      markets.length > 0
+        ? `${markets.length}`
+        : "—"
+    }
+    label="Mandi Listings"
+    detail="Government data"
+  />
 
-        </div>
-
+</div>
         {/* SEARCH + FILTER */}
         <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
 
@@ -242,8 +273,13 @@ function Marketplace() {
                 >
                   <option>All</option>
                   <option>Tomato</option>
-                  <option>Potato</option>
-                  <option>Onion</option>
+<option>Potato</option>
+<option>Onion</option>
+<option>Wheat</option>
+<option>Rice</option>
+<option>Maize</option>
+<option>Carrot</option>
+<option>Cauliflower</option>
                 </select>
 
               </div>
@@ -283,14 +319,18 @@ function Marketplace() {
                 </p>
 
                 <h2 className="mt-1 text-xl font-bold">
-                  Azadpur Mandi currently offers the strongest tomato price.
-                </h2>
+  {markets.length > 0
+    ? `${markets[0].name} currently offers the highest listed price for ${markets[0].crop}.`
+    : "Analyzing current mandi prices..."}
+</h2>
 
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
-                  Prices are trending upward and buyer demand is high.
-                  Consider comparing transport cost before making your final
-                  selling decision.
-                </p>
+  {markets.length > 0
+    ? `The highest listed modal price is ₹${markets[0].price.toLocaleString(
+        "en-IN"
+      )} per quintal. Compare transport and market conditions before making your final selling decision.`
+    : "Fetching today's government mandi data."}
+</p>
               </div>
 
             </div>
@@ -324,37 +364,197 @@ function Marketplace() {
 
           </div>
 
-          <div className="mt-5 grid gap-4">
+          {loading && (
+  <div className="mt-5 rounded-2xl border border-green-100 bg-white p-10 text-center">
+    <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-green-100 border-t-green-600" />
 
-            {filteredMarkets.map((market, index) => (
-              <MarketCard
-                key={`${market.name}-${index}`}
-                market={market}
-                recommended={index === 0 && sort === "price"}
-              />
-            ))}
+    <p className="mt-4 font-bold text-slate-700">
+      Loading real mandi prices...
+    </p>
 
+    <p className="mt-1 text-sm text-slate-400">
+      Fetching today's government market data
+    </p>
+  </div>
+)}
+
+{error && (
+  <div className="mt-5 rounded-2xl border border-red-100 bg-red-50 p-6 text-center">
+    <p className="font-bold text-red-700">
+      Unable to load mandi data
+    </p>
+
+    <p className="mt-2 text-sm text-red-600">
+      {error}
+    </p>
+  </div>
+)}
+
+{!loading && !error && (
+  <>
+    <div className="mt-5 grid gap-4">
+      {filteredMarkets.map((market, index) => (
+       <MarketCard
+  key={`${market.name}-${index}`}
+  market={market}
+  recommended={index === 0 && sort === "price"}
+  onView={() => setSelectedMarket(market)}
+/>
+      ))}
+    </div>
+
+    {filteredMarkets.length === 0 && (
+      <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
+        <Search
+          size={30}
+          className="mx-auto text-slate-300"
+        />
+
+        <h3 className="mt-4 font-bold">
+          No markets found
+        </h3>
+
+        <p className="mt-1 text-sm text-slate-400">
+          Try changing your search or crop filter.
+        </p>
+      </div>
+    )}
+  </>
+)}
+        </div>
+
+
+        {selectedMarket && (
+  <div
+    className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-5 backdrop-blur-sm"
+    onClick={() => setSelectedMarket(null)}
+  >
+    <div
+      className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl"
+      onClick={(e) => e.stopPropagation()}
+    >
+
+      <div className="flex items-start justify-between">
+
+        <div className="flex items-center gap-3">
+
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-50 text-green-600">
+            <MapPin size={22} />
           </div>
 
-          {filteredMarkets.length === 0 && (
-            <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
-              <Search
-                size={30}
-                className="mx-auto text-slate-300"
-              />
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-green-600">
+              Government Mandi
+            </p>
 
-              <h3 className="mt-4 font-bold">
-                No markets found
-              </h3>
+            <h2 className="text-xl font-black">
+              {selectedMarket.name}
+            </h2>
 
-              <p className="mt-1 text-sm text-slate-400">
-                Try changing your search or crop filter.
-              </p>
-            </div>
-          )}
+            <p className="text-sm text-slate-400">
+              {selectedMarket.city}
+            </p>
+          </div>
 
         </div>
 
+        <button
+          onClick={() => setSelectedMarket(null)}
+          className="rounded-xl px-3 py-2 text-xl font-bold text-slate-400 hover:bg-slate-100"
+        >
+          ×
+        </button>
+
+      </div>
+
+      <div className="mt-6 rounded-2xl bg-green-50 p-5">
+
+        <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+          Crop
+        </p>
+
+        <p className="mt-1 text-lg font-black">
+          {selectedMarket.crop}
+        </p>
+
+        <div className="mt-5 grid grid-cols-3 gap-3">
+
+          <div className="rounded-xl bg-white p-3">
+            <p className="text-xs text-slate-400">
+              Min Price
+            </p>
+            <p className="mt-1 font-black">
+              ₹{selectedMarket.minPrice.toLocaleString("en-IN")}
+            </p>
+          </div>
+
+          <div className="rounded-xl bg-white p-3 ring-2 ring-green-200">
+            <p className="text-xs text-green-600">
+              Modal Price
+            </p>
+            <p className="mt-1 font-black text-green-700">
+              ₹{selectedMarket.price.toLocaleString("en-IN")}
+            </p>
+          </div>
+
+          <div className="rounded-xl bg-white p-3">
+            <p className="text-xs text-slate-400">
+              Max Price
+            </p>
+            <p className="mt-1 font-black">
+              ₹{selectedMarket.maxPrice.toLocaleString("en-IN")}
+            </p>
+          </div>
+
+        </div>
+
+      </div>
+
+      <div className="mt-5 grid grid-cols-2 gap-3">
+
+        <div className="rounded-xl border border-slate-200 p-4">
+          <p className="text-xs text-slate-400">
+            Arrival Date
+          </p>
+          <p className="mt-1 font-bold">
+            {selectedMarket.arrivalDate}
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 p-4">
+          <p className="text-xs text-slate-400">
+            Data Source
+          </p>
+          <p className="mt-1 font-bold text-green-600">
+            data.gov.in
+          </p>
+        </div>
+
+      </div>
+
+      <div className="mt-6 grid grid-cols-2 gap-3">
+
+  <button
+    onClick={() => setSelectedMarket(null)}
+    className="rounded-xl border border-slate-200 py-3 font-bold text-slate-700 transition hover:bg-slate-50"
+  >
+    Done
+  </button>
+
+  <Link
+  to="/add-produce"
+  state={{ selectedMarket }}
+  className="flex items-center justify-center gap-2 rounded-xl bg-green-600 py-3 font-bold text-white transition hover:bg-green-700"
+>
+  Use This Market
+  <ArrowUpRight size={16} />
+</Link>
+
+</div>
+
+    </div>
+  </div>
+)}
       </main>
     </div>
   );
@@ -386,8 +586,8 @@ function SummaryCard({ icon, value, label, detail }) {
   );
 }
 
-function MarketCard({ market, recommended }) {
-  return (
+function MarketCard({ market, recommended, onView }) {
+    return (
     <div
       className={`rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg ${
         recommended
@@ -422,8 +622,8 @@ function MarketCard({ market, recommended }) {
             </div>
 
             <p className="mt-1 text-sm text-slate-400">
-              {market.city} · {market.distance} km away
-            </p>
+  {market.city} · Updated {market.arrivalDate}
+</p>
 
           </div>
 
@@ -452,8 +652,8 @@ function MarketCard({ market, recommended }) {
           </p>
 
           <p className="text-xs font-bold text-green-600">
-            {market.change}
-          </p>
+  data.gov.in
+</p>
 
         </div>
 
@@ -479,20 +679,22 @@ function MarketCard({ market, recommended }) {
             </span>
 
           </div>
-
-          <p className="mt-1 text-xs text-slate-400">
-            {market.buyers} buyers
-          </p>
+<p className="mt-1 text-xs text-slate-400">
+  Government mandi listing
+</p>
 
         </div>
 
         {/* ACTION */}
         <div>
 
-          <button className="flex w-full items-center justify-center gap-2 rounded-xl border border-green-200 px-4 py-2.5 text-sm font-bold text-green-700 transition hover:bg-green-50 lg:w-auto">
-            View Market
-            <ArrowUpRight size={16} />
-          </button>
+ <button
+  onClick={onView}
+  className="flex w-full items-center justify-center gap-2 rounded-xl border border-green-200 px-4 py-2.5 text-sm font-bold text-green-700 transition hover:bg-green-50 lg:w-auto"
+>
+  View Market
+  <ArrowUpRight size={16} />
+</button>
 
         </div>
 
